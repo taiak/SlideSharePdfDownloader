@@ -1,2 +1,3 @@
 # SlideSharePdfDownloader
-Slide Share'a söyleyin adam olsun
+SlideShare da bazı sunumları indiremediğim için yazdığım ruby programı
+
