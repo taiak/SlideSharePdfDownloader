@@ -1,3 +1,4 @@
+# for faster thread
 module ThreadHunter
   def thread_hunt
     map do |work|
@@ -6,6 +7,7 @@ module ThreadHunter
   end
 end
 
+# add thead hunter into array class
 class Array
   include ThreadHunter
 end
@@ -21,6 +23,7 @@ class SlideShareDownloader
   end
 
   private
+
   # choose image quality
   def choose_size(size = 'full')
     case size
@@ -126,13 +129,14 @@ class SlideShareDownloader
     end
   end
 
-  public 
+  public
+
   # download single file
   def download(url, pdf_name, size = 'full')
     pdf_name = make_file_name pdf_name, size
-    
+
     return false if exist_file? "#{pdf_name}.pdf"
-    
+
     puts "#{pdf_name} downloading..."
     links = get_links url, size
 
