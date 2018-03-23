@@ -1,18 +1,26 @@
+module ThreadHunter
+  def thread_hunt
+    map do |work|
+      Thread.new { work.join }
+    end.each(&:join)
+  end
+end
+
+class Array
+  include ThreadHunter
+end
+
 # slide share pdf downloader
 class SlideShareDownloader
-  require 'progressbar'
   require 'curl'
 
   def initialize
     create_curl
-    set_site_pattern
+    @site_pattern = '<section data-index='
     @patterns = [',', '-', '__', '/', /[\(\)]/, '`', '"', "\'", '*']
   end
 
-  def set_site_pattern
-    @site_pattern = '<section data-index='
-  end
-
+  private
   # choose image quality
   def choose_size(size = 'full')
     case size
@@ -20,8 +28,6 @@ class SlideShareDownloader
       /data-small="(.*)"/
     when 'normal'
       /data-normal="(.*)"/
-    when 'full'
-      /data-full="(.*)"/
     else
       /data-full="(.*)"/
     end
@@ -46,74 +52,48 @@ class SlideShareDownloader
     contents.map { |content| content.match(choose_size(size)).captures.first }
   end
 
-  # download images from links
-  def download_images_with_pb(name, links)
-    if File.file?(add_ext(name))
-      puts "#{add_ext name} found!"
-      return false
-    end
-
-    pb = ProgressBar.create(title: name[0..20],
-                            total: links.size,
-                            format: '%t |%a: %B %P%% |')
-
-    links.each_with_index do |link, i|
-      pb.increment
-      file = "#{name}_#{i}.jpg"
-      next if File.file?(file)
-      system "curl #{link} >'#{file}' 2>/dev/null"
-    end
-    true
+  def download_image(link, name, number)
+    file = "#{name}_#{number}.jpg"
+    return false if exist_file?(file)
+    system "curl #{link} >'#{file}' 2>/dev/null"
   end
+
+  # download images from links
 
   def download_images(name, links)
-    if File.file?(add_ext(name))
-      puts "#{add_ext name} found!"
-      return false
-    end
-
-    links.each_with_index do |link, i|
-      file = "#{name}_#{i}.jpg"
-      next if File.file?(file)
-      system "curl #{link} >'#{file}' 2>/dev/null"
-    end
-    true
-  end
-
-  # add extension to string
-  def add_ext(str, ext = 'pdf')
-    "#{str}.#{ext}"
+    links.each_with_index.map do |link, i|
+      Thread.new { download_image link, name, i }
+    end.thread_hunt
   end
 
   # symbolize all jpg file start with name
-  def images_name(name)
+  def all_images_name(name)
     "#{name}_*.jpg"
   end
 
   # convert images to pdf
-  def image_to_pdf(pdf_name)
-    name = add_ext pdf_name, 'pdf'
+  def image_to_pdf(name)
+    pdf_name = "#{name}.pdf"
 
-    if File.file?(name)
-      puts "Warning: #{name} still exist..."
+    if exist_file?(pdf_name)
       puts 'Canceling to converting...'
       return false
     end
 
-    puts   "Converting to pdf for #{pdf_name}..."
-    system "convert #{images_name pdf_name} '#{name}'"
+    puts   "Converting to pdf for #{name}..."
+    system "convert #{all_images_name name} '#{pdf_name}'"
     true
   end
 
-  # OPTIMIZE: make multi platform
+  # OPTIMIZE: add support for multi platform
   def optimize_images(name)
-    puts "Images optimization start for #{name}.."
-    system "jpegoptim #{images_name name} >/dev/null"
+    puts   "Images optimization start for #{name}.."
+    system "jpegoptim #{all_images_name name} >/dev/null"
   end
 
   # remove all image file
   def rm_jpgs_start_with(name)
-    Dir.glob(images_name(name)).each { |f| File.delete(f) }
+    Dir.glob(all_images_name(name)).each { |f| File.delete(f) }
   end
 
   # make useful and uniq name from pdf_name and size
@@ -131,42 +111,40 @@ class SlideShareDownloader
     seperate_to_links contents, size
   end
 
-  # is file exist? only for file
-  def file?(name)
-    File.file?(name) ? true : false
-  end
-
   def process_images(pdf_name)
     optimize_images pdf_name
     image_to_pdf pdf_name
     rm_jpgs_start_with pdf_name
   end
 
-  # download single file
-  def download(url, pdf_name, size = 'full', progressbar = true)
-    pdf_name = make_file_name pdf_name, size
-
-    if file?(add_ext(pdf_name, 'pdf'))
-      puts "#{pdf_name} found!"
-      return false
+  def exist_file?(name)
+    if File.file?(name)
+      puts "#{name} found!"
+      true
+    else
+      false
     end
+  end
+
+  public 
+  # download single file
+  def download(url, pdf_name, size = 'full')
+    pdf_name = make_file_name pdf_name, size
+    
+    return false if exist_file? "#{pdf_name}.pdf"
+    
     puts "#{pdf_name} downloading..."
     links = get_links url, size
-    if progressbar
-      download_images_with_pb pdf_name, links
-    else
-      download_images pdf_name, links
-    end
+
+    download_images pdf_name, links
 
     process_images pdf_name
-    true
   end
 
   # download url's from hash info
   def parallel_download(url_hsh, size = 'full')
-    threads = url_hsh.collect do |name, link|
-      Thread.new { download(link, name, size, false) }
-    end
-    threads.map { |work| Thread.new { work.join } }.each(&:join)
+    url_hsh.map do |name, link|
+      Thread.new { download(link, name, size) }
+    end.thread_hunt
   end
 end
