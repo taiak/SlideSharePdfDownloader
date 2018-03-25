@@ -1,7 +1,7 @@
 # for faster thread
 module ThreadHunter
   def thread_hunt
-    map do |work|
+    self.map do |work|
       Thread.new { work.join }
     end.each(&:join)
   end
@@ -22,17 +22,15 @@ class SlideShareDownloader
     @patterns = [',', '-', '__', '/', /[\(\)]/, '`', '"', "\'", '*']
   end
 
-  private
-
   # choose image quality
   def choose_size(size = 'full')
     case size
     when 'small'
-      /data-small="(.*)"/
+      /data-small="([^\"]*)"/
     when 'normal'
-      /data-normal="(.*)"/
+      /data-normal="([^\"]*)"/
     else
-      /data-full="(.*)"/
+      /data-full="([^\"]*)"/
     end
   end
 
@@ -58,14 +56,14 @@ class SlideShareDownloader
   def download_image(link, name, number)
     file = "#{name}_#{number}.jpg"
     return false if exist_file?(file)
-    system "curl #{link} >'#{file}' 2>/dev/null"
+    system "curl #{link} > '#{file}' 2>/dev/null"
   end
 
   # download images from links
 
   def download_images(name, links)
     links.each_with_index.map do |link, i|
-      Thread.new { download_image link, name, i }
+    	Thread.new { download_image link, name, i }
     end.thread_hunt
   end
 
@@ -139,9 +137,7 @@ class SlideShareDownloader
 
     puts "#{pdf_name} downloading..."
     links = get_links url, size
-
     download_images pdf_name, links
-
     process_images pdf_name
   end
 
