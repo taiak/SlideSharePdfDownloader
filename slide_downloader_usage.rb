@@ -9,13 +9,11 @@ url_hsh = {
 ss = SlideShareDownloader.new
 
 strt = Time.new
-# download single file
-# url_hsh.each do |file_name, link|
-#   ss.download link, file_name, 'full', false
-# end
 
-# download paralel
-ss.parallel_download url_hsh, 'full'
+url_hsh.each do |file_name, link|
+  ss.download link, file_name, 'full'
+end
+
 fin = Time.new
 
 puts "#{fin -strt} sn"
